@@ -14,13 +14,13 @@ The QMX Control & Support Program is a Python/Tkinter desktop application for co
 ### Main features
 - Frequency, mode, band and RF Gain control
 - 4 fixed memory buttons plus a variable **Extra Memories** drop-down
-- 4 programmable CW messages (one reserved for your callsign) plus a free-text CW entry field
+- 4 programmable **CW messages** (one reserved for your callsign) plus a free-text CW entry field
 - **TUNE** button for antenna tuning
 - **RBN Spots** window — shows Reverse Beacon Network reports of your own CQ calls
 - **DX Cluster** window — shows DX spots filtered to your QMX model's frequency range, with click-to-tune and QSO logging
 - **SPOTS** window - shows POTA, SOTA, WWFF spots based on a filter in the qmx.ini file , with click-to-tune and QSO logging
 - Integration with **Cloudlog** for automatic QSO logging
-- S meter and Power meter integration
+- **S meter** and **Power meter** integration
 
 ---
 
@@ -59,6 +59,8 @@ The QMX Control & Support Program is a Python/Tkinter desktop application for co
    - Linux/macOS: run `python3 main.py` from the folder
 
 If `qmx.ini` is missing or incomplete, the program will fail to start, since all key settings are read from it at launch.
+
+> **Note:** the program is very sensitive regarding , and ; in the .ini file. So carefull when adapting your need in this file. Mandaory is CALLSIGN as NOCALL will prevent connecting the DX Cluster.
 
 ---
 
@@ -134,14 +136,13 @@ servers =
     	dxc.hamserve.uk,7300
 call = ${Messages:callsign}
 ```
-Your preferred DX Cluster server and alternatives plus the callsign used to log in.
+Your preferred DX Cluster server and alternatives, plus the callsign used to log in.
 
 ### `[Filters]`
 ```
 commands =
     clear/spots all
     accept/spots on hf and by_zone 14,15,16
-
 ```
 A list of cluster filter/setup commands (one per line) sent automatically after login.
 
@@ -253,7 +254,7 @@ project-folder/
 ├── dxcluster.py      (DX Cluster network client)
 ├── rbnetwork.py      (RBN network client)
 ├── tooltip.py        (button tooltips)
-└── spotsnetwork.py   (POTA, SOTA, WWFF client)
+├── spotsnetwork.py   (POTA, SOTA, WWFF client)
 └── cloudlog.py       (Cloudlog logging API)
 ```
 
