@@ -1,4 +1,4 @@
-# PA3ANG QMX Control & Support Program
+# QMX Control & Support Program
 ## Version 1.0 (July 2026)
 
 ---
