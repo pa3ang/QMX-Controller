@@ -196,7 +196,7 @@ A text field below the memory buttons lets you type any custom CW message and se
 > **Note:** the CW buttons, the manual CW entry field, and the RBN window are only active (colored/enabled) while the transceiver is in **CW mode**. In any other mode they are grayed out and disabled.
 
 ### RBN Spots window
-Displays live Reverse Beacon Network reports of your own CQ calls — useful for checking your signal reports across the world in real time. The list has a scroll option.
+Displays live Reverse Beacon Network reports of your own CQ calls — useful for checking your signal reports across the world in real time. The list has a scroll option and the latest spots get on top.
 
 ### DX Cluster window
 Displays DX spots filtered so that only spots within your QMX model's supported frequency range are shown (FT8/FT4 digital spots are filtered out automatically).
