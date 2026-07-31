@@ -247,13 +247,14 @@ For both
 
 ```
 project-folder/
-├── qmx.ini        (your settings — edit this)
-├── main.py        (this program)
-├── qmx.py         (QMX CAT communication)
-├── dxcluster.py   (DX Cluster network client)
-├── rbnetwork.py   (RBN network client)
-├── tooltip.py     (button tooltips)
-└── cloudlog.py     (Cloudlog logging API)
+├── qmx.ini           (your settings — edit this)
+├── main.py           (this program)
+├── qmx.py            (QMX CAT communication)
+├── dxcluster.py      (DX Cluster network client)
+├── rbnetwork.py      (RBN network client)
+├── tooltip.py        (button tooltips)
+└── spotsnetwork.py   (POTA, SOTA, WWFF client)
+└── cloudlog.py       (Cloudlog logging API)
 ```
 
 Windows users only need the `.exe` and `qmx.ini`.
