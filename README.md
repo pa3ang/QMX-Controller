@@ -1,5 +1,6 @@
-# PA3ANG QMX Control & Support Program
+# QMX Control & Support Program
 ## Version 1.0 (July 2026)
+## Version 1.1 (September 2026)
 
 ---
 
@@ -14,14 +15,14 @@ The QMX Control & Support Program is a Python/Tkinter desktop application for co
 ### Main features
 - Frequency, mode, band and RF Gain control
 - 4 fixed memory buttons plus a variable **Extra Memories** drop-down
-- 4 programmable CW messages (one reserved for your callsign) plus a free-text CW entry field
+- 4 programmable **CW messages** (one reserved for your callsign) plus a free-text CW entry field
 - **TUNE** button for antenna tuning
 - **RBN Spots** window — shows Reverse Beacon Network reports of your own CQ calls
 - **DX Cluster** window — shows DX spots filtered to your QMX model's frequency range, with click-to-tune and QSO logging
 - **SPOTS** window - shows POTA, SOTA, WWFF spots based on a filter in the qmx.ini file , with click-to-tune and QSO logging
 - Integration with **Cloudlog** for automatic QSO logging
-- S meter and Power meter integration
-
+- **S meter** and **Power meter** integration
+- Since version 1.1 **WebSDR** connectivity based om the Maasbree Low band WebSDR
 ---
 
 ## 2. Requirements
@@ -41,7 +42,8 @@ The QMX Control & Support Program is a Python/Tkinter desktop application for co
 | `rbnetwork.py` | RBN network class |
 | `tooltip.py` | Tooltip helper for the CW message buttons |
 | `cloudlog.py` | Cloudlog logging API class |
-| `spotsnetwork` | Connection to POTA, SOTA and WWFF |
+| `spotsnetwork.py` | Connection to POTA, SOTA and WWFF |
+| `websdr.py` | Connection to WebSDR |
 
 **Windows users:** an executable (.exe) version is available. You only need to keep `qmx.ini` alongside the executable — the other `.py` files are already bundled in.
 
@@ -59,6 +61,8 @@ The QMX Control & Support Program is a Python/Tkinter desktop application for co
    - Linux/macOS: run `python3 main.py` from the folder
 
 If `qmx.ini` is missing or incomplete, the program will fail to start, since all key settings are read from it at launch.
+
+> **Note:** the program is very sensitive regarding , and ; in the .ini file. So carefull when adapting your need in this file. Mandaory is CALLSIGN as NOCALL will prevent connecting the DX Cluster.
 
 ---
 
@@ -134,14 +138,13 @@ servers =
     	dxc.hamserve.uk,7300
 call = ${Messages:callsign}
 ```
-Your preferred DX Cluster server and alternatives plus the callsign used to log in.
+Your preferred DX Cluster server and alternatives, plus the callsign used to log in.
 
 ### `[Filters]`
 ```
 commands =
     clear/spots all
     accept/spots on hf and by_zone 14,15,16
-
 ```
 A list of cluster filter/setup commands (one per line) sent automatically after login.
 
@@ -168,6 +171,12 @@ APIKey   = xxxxxxxxxxxxxxxx
 StationID = 1
 ```
 Your Cloudlog instance details, used for one-click QSO logging from the DX Cluster window.
+
+### `[WebSDR]`
+```
+url = http://sdr.websdrmaasbree.nl:8901/
+```
+Currently de program is working with the Maasbree WebSDR only
 
 ---
 
@@ -196,7 +205,7 @@ A text field below the memory buttons lets you type any custom CW message and se
 > **Note:** the CW buttons, the manual CW entry field, and the RBN window are only active (colored/enabled) while the transceiver is in **CW mode**. In any other mode they are grayed out and disabled.
 
 ### RBN Spots window
-Displays live Reverse Beacon Network reports of your own CQ calls — useful for checking your signal reports across the world in real time. The list has a scroll option.
+Displays live Reverse Beacon Network reports of your own CQ calls — useful for checking your signal reports across the world in real time. The list has a scroll option and the latest spots get on top.
 
 ### DX Cluster window
 Displays DX spots filtered so that only spots within your QMX model's supported frequency range are shown (FT8/FT4 digital spots are filtered out automatically).
@@ -247,13 +256,14 @@ For both
 
 ```
 project-folder/
-├── qmx.ini        (your settings — edit this)
-├── main.py        (this program)
-├── qmx.py         (QMX CAT communication)
-├── dxcluster.py   (DX Cluster network client)
-├── rbnetwork.py   (RBN network client)
-├── tooltip.py     (button tooltips)
-└── cloudlog.py     (Cloudlog logging API)
+├── qmx.ini           (your settings — edit this)
+├── main.py           (this program)
+├── qmx.py            (QMX CAT communication)
+├── dxcluster.py      (DX Cluster network client)
+├── rbnetwork.py      (RBN network client)
+├── tooltip.py        (button tooltips)
+├── spotsnetwork.py   (POTA, SOTA, WWFF client)
+└── cloudlog.py       (Cloudlog logging API)
 ```
 
 Windows users only need the `.exe` and `qmx.ini`.
