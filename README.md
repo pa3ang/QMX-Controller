@@ -251,7 +251,7 @@ For both
 
 ---
 
-## 8. File Summary (Linux/macOS)
+## 8. File Summary 
 
 ```
 project-folder/
@@ -265,11 +265,11 @@ project-folder/
 └── cloudlog.py       (Cloudlog logging API)
 ```
 
-Windows users only need the `.exe` and `qmx.ini`.
+Windows users can also use the `.exe` and `qmx.ini`.
 
 ---
 
-# 9. Tkinter differences: Linux versus Windows
+## 9. Tkinter differences: Linux versus Windows
 
 The width of some buttons needs to be adjusted because Tkinter renders them differently on Linux and Windows.
 
