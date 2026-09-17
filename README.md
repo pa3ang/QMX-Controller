@@ -269,3 +269,24 @@ Windows users only need the `.exe` and `qmx.ini`.
 
 ---
 
+# 9. Tkinter differences: Linux versus Windows
+
+The width of some buttons needs to be adjusted because Tkinter renders them differently on Linux and Windows.
+
+| Button     | Linux | Windows | Comment                                     |
+| ---------- | ----: | ------: | ------------------------------------------- |
+| CW buttons |     9 |      11 | 4 buttons in the upper-right corner         |
+| QMB        |     7 |      10 | The 5 buttons in the second row             |
+| MEMORIES   |     7 |       8 | The Memory drop-down button                 |
+| WebSDR OFF |     8 |      10 | The button on the bottom line, on the right |
+
+The window geometry also differs between the two platforms:
+
+```python
+# Linux
+window.geometry("600x840")
+
+# Windows
+window.geometry("670x880")
+```
+---
