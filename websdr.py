@@ -2,6 +2,7 @@
 # Classic WebSDR control via Playwright
 # Made with Maasbree WebSDR as example / template
 # http://sdr.websdrmaasbree.nl:8901/
+
 import threading
 import time
 import queue
@@ -11,6 +12,7 @@ class WebSDR:
     BAND_MAP={"160m":0,"80m":1,"60m":2,"40m":3,"30m":4,"20m":5,"17m":6,"15m":7}
     BAND_INDEX_MAP={value:key for key,value in BAND_MAP.items()}
     VALID_MODES=("LSB","USB","CW","AM")
+
     def __init__(self,url,frequency_callback=None,mode_callback=None):
         self.url=url
         self.frequency_callback=frequency_callback
@@ -23,15 +25,15 @@ class WebSDR:
         self.last_frequency=None
         self.last_mode=None
         self.current_band=None
-        self.target_frequency=None
-        self.target_mode=None
-        self.target_band=None
+        self.has_band_control=True
         self.commands=queue.Queue()
+
     def start(self):
         if self.running:return
         self.running=True
         self.thread=threading.Thread(target=self._worker,daemon=True)
         self.thread.start()
+
     def stop(self):
         if not self.running:return
         self.running=False
@@ -42,54 +44,73 @@ class WebSDR:
         self.page=None
         self.tuning=False
         self.current_band=None
+
     def is_ready(self):return self.ready
     def is_tuning(self):return self.tuning
     def get_frequency(self):return self.last_frequency
     def get_mode(self):return self.last_mode
     def get_band(self):return self.current_band
+    def set_band_control(self,enabled):self.has_band_control=enabled
+
     def set_frequency(self,frequency_hz):
         if not self.running:return
         self.commands.put(("frequency",frequency_hz))
+
     def set_mode(self,mode):
         if not self.running:return
         mode=str(mode).upper()
         if mode not in self.VALID_MODES:
             print(f"WebSDR: onbekende mode {mode}");return
         self.commands.put(("mode",mode))
+
     def set_band(self,band):
         if not self.running:return
         if band not in self.BAND_MAP:
             print(f"WebSDR: onbekende band {band}");return
         self.commands.put(("band",band))
+
     def tune(self,band,frequency_hz,mode):
         if not self.running:return
-        if band not in self.BAND_MAP:
+        if self.has_band_control and band not in self.BAND_MAP:
             print(f"WebSDR: onbekende band {band}");return
         mode=str(mode).upper()
         if mode not in self.VALID_MODES:
             print(f"WebSDR: onbekende mode {mode}");return
         self.commands.put(("tune",(band,frequency_hz,mode)))
     def _worker(self):
+        from pathlib import Path
+        import sys
+        if getattr(sys,"frozen",False):
+            base_path=Path(sys.executable).parent
+            chromium_path=base_path/"chromium"/"chrome-win64"/"chrome.exe"
+            if not chromium_path.exists():
+                print(f"WebSDR fout: Chromium niet gevonden: {chromium_path}")
+                return
+            browser_executable=str(chromium_path)
+        else:
+            browser_executable=None
         with sync_playwright() as p:
-            browser=p.chromium.launch(headless=False)
+            if browser_executable:
+                browser=p.chromium.launch(executable_path=browser_executable,headless=False)
+            else:
+                browser=p.chromium.launch(headless=False)
             context=browser.new_context(viewport={"width":1080,"height":680})
             page=context.new_page()
             self.page=page
             try:
                 print(f"WebSDR openen: {self.url}")
                 page.goto(self.url,wait_until="domcontentloaded")
+                self.has_band_control=bool(page.evaluate("()=>typeof setband_new==='function'"))
+                print(f"WebSDR band control: {self.has_band_control}")
                 time.sleep(.1)
-                page.evaluate("""() => {const header=document.getElementById('headerwebsdr');if(header)header.style.display='none';}""")
+                page.evaluate("""()=>{const header=document.getElementById('headerwebsdr');if(header)header.style.display='none';}""")
                 try:
                     audio_started=page.evaluate("""
-                        () => {
-                            const elements=document.querySelectorAll('input, button');
+                        ()=>{
+                            const elements=document.querySelectorAll('input,button');
                             for(const el of elements){
                                 const text=(el.value||el.innerText||'').trim().toLowerCase();
-                                if(text==='audio start'){
-                                    el.click();
-                                    return true;
-                                }
+                                if(text==='audio start'){el.click();return true;}
                             }
                             return false;
                         }
@@ -112,90 +133,64 @@ class WebSDR:
                 self.tuning=False
                 self.current_band=None
                 try:browser.close()
-                except Exception:pass 
+                except Exception:pass
+
     def _execute_commands(self):
-            while True:
-                try:command,args=self.commands.get_nowait()
-                except queue.Empty:break
-                if command=="stop":return
-                if not self.page:continue
-                try:
-                    if command=="frequency":self._set_frequency(args)
-                    elif command=="mode":self._set_mode(args)
-                    elif command=="band":self._set_band(args)
-                    elif command=="tune":self._tune(args[0],args[1],args[2])
-                except Exception as e:print(f"WebSDR command fout: {e}")
+        while True:
+            try:command,args=self.commands.get_nowait()
+            except queue.Empty:return
+            if command=="stop":return
+            if not self.page:continue
+            try:
+                if command=="frequency":self._set_frequency(args)
+                elif command=="mode":self._set_mode(args)
+                elif command=="band":self._set_band(args)
+                elif command=="tune":self._tune(args[0],args[1],args[2])
+            except Exception as e:
+                print(f"WebSDR command fout: {e}")
+
     def _set_frequency(self,frequency_hz):
         frequency_khz=frequency_hz/1000
         print(f"WebSDR frequentie: {frequency_khz:.2f} kHz")
         self.page.evaluate("""(freq)=>{document.forms.freqform.frequency.value=freq.toFixed(2);setfreq(freq);}""",frequency_khz)
         self.last_frequency=frequency_hz
+
     def _set_mode(self,mode):
         print(f"WebSDR mode: {mode}")
-        self.page.evaluate("""(new_mode)=>{set_mode(new_mode);}""",mode)
+        self.page.evaluate("(new_mode)=>set_mode(new_mode)",mode)
         self.last_mode=mode
+
     def _set_band(self,band):
         band_index=self.BAND_MAP.get(band)
         if band_index is None:return
         if self.current_band==band:
             print(f"WebSDR band blijft op {band}");return
         print(f"WebSDR band wijzigen: {self.current_band} -> {band}")
-        self.page.evaluate("""(b)=>{setband_new(b);}""",band_index)
-        time.sleep(0.4)
+        self.page.evaluate("(b)=>setband_new(b)",band_index)
+        time.sleep(0.3)
         self.current_band=band
         print(f"WebSDR band: {band}")
+
     def _tune(self,band,frequency_hz,mode):
-        band_index=self.BAND_MAP.get(band)
-        if band_index is None:return
+        band_index=self.BAND_MAP.get(band) if self.has_band_control else None
+        if self.has_band_control and band_index is None:return
         frequency_khz=frequency_hz/1000
-        print(f"WebSDR tune starten: {band} {frequency_khz:.2f} kHz {mode}")
-        self.target_frequency=frequency_hz
-        self.target_mode=mode
-        self.target_band=band
+        print(f"WebSDR tune: {frequency_khz:.2f} kHz {mode}")
         self.tuning=True
         try:
-            if self.current_band!=band:
-                print(f"QMX -> WebSDR band: {band} ({band_index})")
-                self.page.evaluate("""(b)=>{setband_new(b);}""",band_index)
-                time.sleep(0.4)
+            if self.has_band_control and self.current_band!=band:
+                self.page.evaluate("(b)=>setband_new(b)",band_index)
+                time.sleep(0.3)
                 self.current_band=band
-            else:print(f"WebSDR blijft op band {band}")
-            if self.last_mode!=mode:
-                print(f"QMX -> WebSDR mode: {mode}")
-                self.page.evaluate("""(new_mode)=>{set_mode(new_mode);}""",mode)
-                time.sleep(0.4)
-                self.last_mode=mode
-            else:print(f"WebSDR mode blijft op {mode}")
-            print(f"QMX -> WebSDR frequency: {frequency_khz:.2f} kHz")
+            self.page.evaluate("(m)=>set_mode(m)",mode)
             self.page.evaluate("""(freq)=>{document.forms.freqform.frequency.value=freq.toFixed(2);setfreq(freq);}""",frequency_khz)
-            deadline=time.time()+3.0
-            confirmed=False
-            while time.time()<deadline:
-                try:
-                    current_frequency=self.page.evaluate("""()=>{const e=document.forms.freqform.frequency;return e?parseFloat(e.value):null;}""")
-                    current_mode=self.page.evaluate("""()=>typeof mode!=="undefined"?mode:null""")
-                    current_band_index=self.page.evaluate("""()=>typeof band!=="undefined"?band:null""")
-                    actual_band=self.BAND_INDEX_MAP.get(current_band_index)
-                    if actual_band is not None:self.current_band=actual_band
-                    if current_frequency is not None:
-                        current_frequency_hz=current_frequency*1000
-                        current_mode=str(current_mode).upper() if current_mode is not None else None
-                        frequency_ok=abs(current_frequency_hz-frequency_hz)<10
-                        mode_ok=current_mode==mode
-                        band_ok=self.current_band==band
-                        if frequency_ok and mode_ok and band_ok:
-                            confirmed=True;break
-                except Exception:pass
-                time.sleep(0.1)
-            if confirmed:print(f"WebSDR tune klaar: {frequency_khz:.2f} kHz {mode} {band}")
-            else:print(f"WebSDR tune TIMEOUT: verwacht {frequency_khz:.2f} kHz {mode} {band}")
             self.last_frequency=frequency_hz
             self.last_mode=mode
+        except Exception as e:
+            print(f"WebSDR tune fout: {e}")
         finally:
-            self.target_frequency=None
-            self.target_mode=None
-            self.target_band=None
             self.tuning=False
+
     def _poll_websdr(self):
         if not self.page or not self.ready:return
         try:
@@ -224,4 +219,5 @@ class WebSDR:
                 self.last_mode=mode
                 print(f"WebSDR mode gewijzigd: {mode}")
                 if self.mode_callback:self.mode_callback(mode)
-        except Exception as e:print(f"WebSDR poll fout: {e}")
+        except Exception as e:
+            print(f"WebSDR poll fout: {e}")

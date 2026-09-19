@@ -81,7 +81,15 @@ config.read(os.path.join(base_path,"qmx.ini"))
 QMX_MODEL=config.get("QMX","model",fallback="Plus")
 qmx=QMX(config['Serial']['port'],model=QMX_MODEL)
 
-websdr_url=config.get("WebSDR","url",fallback="http://sdr.websdrmaasbree.nl:8901/")
+websdrs={}
+i=1
+while True:
+    name=config.get("WebSDR",f"websdr{i}_name",fallback="")
+    url=config.get("WebSDR",f"websdr{i}_url",fallback="")
+    if not name or not url:
+        break
+    websdrs[name]=url
+    i+=1
 websdr_sync=False
 websdr=None
 qmx_ignore_until=0
@@ -198,21 +206,11 @@ def serial_read():
         update_cw_button()
     if websdr_sync and websdr.is_ready() and freq:
         mode_lookup,band=bandplan_lookup(freq/1000)
-        if time.monotonic()>=qmx_ignore_until:
-            if frequency_changed:
-                if websdr.get_band()!=band:
-                    sync_mode=mode if mode in ("LSB","USB","CW","AM") else mode_lookup
-                    if sync_mode:
-                        block_websdr_feedback()
-                        websdr.tune(band,freq,sync_mode)
-                else:
-                    block_websdr_feedback()
-                    websdr.set_frequency(freq)
-            if mode_changed:
-                sync_mode=mode if mode in ("LSB","USB","CW","AM") else mode_lookup
-                if sync_mode:
-                    block_websdr_feedback()
-                    websdr.set_mode(sync_mode)
+        sync_mode=mode if mode in ("LSB","USB","CW","AM") else mode_lookup
+        websdr_frequency=freq+750 if sync_mode=="CW" else freq
+        if time.monotonic()>=qmx_ignore_until and (frequency_changed or mode_changed) and sync_mode and (not websdr.has_band_control or band):
+            block_websdr_feedback()
+            websdr.tune(band,websdr_frequency,sync_mode)
     bn=qmx.get_band()
     if bn is not None:
         for band,number in qmx.BANDS[qmx.model].items():
@@ -447,11 +445,8 @@ def websdr_mode_changed(mode):
     if not websdr_sync:return
     if time.monotonic()<websdr_ignore_until:return
     if mode is None:return
-    mode_map={"LSB":"LSB","LSBN":"LSB","USB":"USB","USBN":"USB","CW":"CW","CWN":"CW","AM":"AM","AMN":"AM"}
-    qmx_mode=mode_map.get(str(mode).upper())
-    if qmx_mode is None:
-        print(f"WebSDR mode niet ondersteund door QMX: {mode}")
-        return
+ 
+    qmx_mode=str(mode).upper()
     if qmx_mode==last_mode:return
     print(f"WebSDR -> QMX mode: {qmx_mode}")
     block_qmx_feedback()
@@ -461,49 +456,40 @@ def websdr_mode_changed(mode):
     update_band_menu()
     update_cw_button()
 
-def toggle_websdr_sync():
+def select_websdr(event=None):
     global websdr_sync,websdr
-    if not websdr_sync:
-        print("WebSDR starten...")
-        frequency=qmx.get_freq()
-        mode=qmx.get_mode()
-        if frequency is None or mode is None:
-            print("QMX frequentie/mode nog niet beschikbaar")
-            return
-        freq_khz=frequency/1000
-        if mode=="DIGI":mode="USB"
-        url=f"{websdr_url}?tune={freq_khz:.2f}{mode}"
-        print(f"WebSDR URL: {url}")
-        websdr=WebSDR(url,frequency_callback=websdr_frequency_changed,mode_callback=websdr_mode_changed)
-        websdr.start()
-        websdr_sync=True
-        websdr_sync_button.config(text="WebSDR ON",bg="lightgreen")
-        window.after(6000,sync_qmx_to_websdr)
-        print("WebSDR Sync ON")
-    else:
+    choice=websdr_choice.get()
+    if choice=="WebSDR OFF":
         print("WebSDR stoppen...")
         websdr_sync=False
         if websdr is not None:
             websdr.stop()
             websdr=None
-        websdr_sync_button.config(text="WebSDR OFF",bg="lightgrey")
+        websdr_dropdown.configure(style="WebSDROff.TCombobox")
         print("WebSDR Sync OFF")
-
-def sync_qmx_to_websdr():
-    if not websdr_sync or not websdr.is_ready():return
+        return
+    websdr_url=websdrs.get(choice)
+    if not websdr_url:
+        return
+    print(f"WebSDR starten: {choice}")
     frequency=qmx.get_freq()
     mode=qmx.get_mode()
     if frequency is None or mode is None:
         print("QMX frequentie/mode nog niet beschikbaar")
+        websdr_choice.set("WebSDR OFF")
         return
-    mode_lookup,band=bandplan_lookup(frequency/1000)
-    if band is None:
-        print(f"QMX -> WebSDR: geen band gevonden voor {frequency/1000:.2f} kHz")
-        return
-    print(f"QMX -> WebSDR: {frequency/1000:.2f} kHz {mode} {band}")
-    block_websdr_feedback()
-    if mode in ("LSB","USB","CW","AM"):websdr.tune(band,frequency,mode)
-    else:websdr.tune(band,frequency,mode_lookup)
+    freq_khz=frequency/1000
+    if mode=="DIGI":
+        mode="USB"
+    url=f"{websdr_url}?tune={freq_khz:.2f}{mode}"
+    print(f"WebSDR URL: {url}")
+    if websdr is not None:
+        websdr.stop()
+        websdr=None
+    websdr=WebSDR(url,frequency_callback=websdr_frequency_changed,mode_callback=websdr_mode_changed)
+    websdr.start()
+    websdr_sync=True
+    print(f"WebSDR Sync ON: {choice}")
 
 def update_status():
     serial_read()
@@ -521,7 +507,9 @@ spot_states={"SOTA":"DISCONNECTED","POTA":"DISCONNECTED","WWFF":"DISCONNECTED"}
 spot_networks=[]
 def start_spots():
     for cls,name in ((POTA,"POTA"),(SOTA,"SOTA"),(WWFF,"WWFF")):
-        network=cls(source=name,callback=lambda s:window.after(0,spot_received,s),status_callback=spot_status,bands=SPOT_BANDS,modes=SPOT_MODES,max_age=SPOT_MAX_AGE,europe=SPOT_EUROPE,interval=60)
+        args=dict(source=name,callback=lambda s:window.after(0,spot_received,s),status_callback=spot_status,bands=SPOT_BANDS,modes=SPOT_MODES,max_age=SPOT_MAX_AGE,europe=SPOT_EUROPE,interval=60)
+        if cls is SOTA:args["callsign"]=CALLSIGN
+        network=cls(**args)
         network.connect()
         spot_networks.append(network)
 
@@ -759,9 +747,10 @@ spot_list.bind("<Double-Button-1>",tune_spot)
 spot_list.bind("<Button-3>",search_qrz)
 
 bottom_frame=Frame(window,bg=window.cget("bg"))
-bottom_frame.grid(row=12,column=0,columnspan=7,padx=(14,2),pady=4)
+bottom_frame.grid(row=12,column=0,columnspan=7,padx=(24,2),pady=4,sticky="ew")
+
 log_button=Button(bottom_frame,bg="lightgrey",textvariable=log_button_text,command=log_tuned_qso,width=22,relief="flat",highlightthickness=0,bd=2)
-log_button.pack(side=LEFT,padx=(0,40))
+log_button.pack(side=LEFT,padx=(0,10))
 Label(bottom_frame,text="RF Gain",bg=window.cget("bg"),fg="yellow").pack(side=LEFT,padx=2)
 rf_gain_scale=ttk.Scale(bottom_frame,from_=45,to=80,orient="horizontal",length=90,command=rf_gain_move)
 rf_gain_scale.set(qmx.get_rf_gain())
@@ -769,11 +758,21 @@ rf_gain_scale.bind("<ButtonPress-1>",rf_gain_press)
 rf_gain_scale.bind("<ButtonRelease-1>",rf_gain_release)
 rf_gain_scale.pack(side=LEFT,padx=2)
 Label(bottom_frame,textvariable=rf_gain_display,width=6,bg=window.cget("bg"),fg="yellow").pack(side=LEFT,padx=2)
-Frame(bottom_frame,width=25,bg=window.cget("bg")).pack(side=LEFT)
 tune_button=Button(bottom_frame,text="TUNE",width=4,command=toggle_tune,relief="flat",highlightthickness=0,bd=2)
-tune_button.pack(side=LEFT,padx=2)
-websdr_sync_button=Button(bottom_frame,text="WebSDR OFF",width=8,bg="lightgrey",command=toggle_websdr_sync,relief="flat",highlightthickness=0,bd=2)
-websdr_sync_button.pack(side=RIGHT,padx=2)
+tune_button.pack(side=LEFT,padx=(10,10))
+
+websdr_choice=StringVar(value="WebSDR OFF")
+
+websdr_dropdown=ttk.Combobox(
+    bottom_frame,
+    textvariable=websdr_choice,
+    values=list(websdrs.keys())+["WebSDR OFF"],
+    state="readonly",
+    width=12,
+    style="WebSDROff.TCombobox"
+)
+websdr_dropdown.bind("<<ComboboxSelected>>",select_websdr)
+websdr_dropdown.pack(side=LEFT,padx=4)
 
 update_QMB_buttons()
 window.bind("<Button-1>",close_memories,add="+")
