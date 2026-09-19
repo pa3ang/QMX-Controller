@@ -50,6 +50,11 @@
 # PA3ANG V1.3
 # Added WebSDR connection with frequency and mode control vice versa
 # currently WebSDR Maasbree only!
+# 
+# PA3ANG V1.4
+# Changed SOTA connection from API to Telnet
+# Added dynamic choice of websdr  but need to be from WebSDR.org platform
+ 
 
 import configparser
 import threading
