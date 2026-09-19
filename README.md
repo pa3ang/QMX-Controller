@@ -1,5 +1,5 @@
 # QMX Control & Support Program
-## Version 1.1 (September 2026)
+## Version 1.3 (September 2026)
 
 ---
 
