@@ -173,9 +173,13 @@ Your Cloudlog instance details, used for one-click QSO logging from the DX Clust
 
 ### `[WebSDR]`
 ```
-url = http://sdr.websdrmaasbree.nl:8901/
+[WebSDR]
+websdr1_name    = Maasbree
+websdr1_url     = http://sdr.websdrmaasbree.nl:8901/
+websdr2_name    = Twente
+websdr2_url     = http://websdr.ewi.utwente.nl:8901/
 ```
-Currently de program is working with the Maasbree WebSDR only
+Currently de program is working with websdr.org compatable WebSDR only. The above mentioned WebSDR do work.
 
 ---
 
@@ -224,7 +228,7 @@ For both
 | **Log QSO** | The last double-cliked spot line will be logged including Callsign, Frequency=Band, Mode, SOTA,POTA,WWFF (optional) with comment QMX-Controller. |
 | **RF GAIN** adjust | With the slider the RF Gain can be changed. The QMX will always change to the default value (from it's internal band configuration) when changing band. |
 | **TUNE** | With this button you can put the QMX in SWR measurement. All comms are stopped and the button turns red. Click again to exit. |
-
+| **WebSDR** | Select a WebSDR from to list of WebSDR OFF to cut the current connection. The WebSDR must be compatable with websdr.org. |
 ---
 
 ## 6. Typical Workflow
@@ -262,7 +266,8 @@ project-folder/
 ├── rbnetwork.py      (RBN network client)
 ├── tooltip.py        (button tooltips)
 ├── spotsnetwork.py   (POTA, SOTA, WWFF client)
-└── cloudlog.py       (Cloudlog logging API)
+├── cloudlog.py       (Cloudlog logging API)
+└── websdr.py         (WebSDR connection)
 ```
 
 Windows users can also use the `.exe` and `qmx.ini`.
@@ -278,7 +283,8 @@ The width of some buttons needs to be adjusted because Tkinter renders them diff
 | CW buttons |     9 |      11 | 4 buttons in the upper-right corner         |
 | QMB        |     7 |      10 | The 5 buttons in the second row             |
 | MEMORIES   |     7 |       8 | The Memory drop-down button                 |
-| WebSDR OFF |     8 |      10 | The button on the bottom line, on the right |
+| TUNE       |     4 |       6 | The button on the bottom line               |
+| WebSDR OFF |    12 |      14 | The button on the bottom line, on the right |
 
 The window geometry also differs between the two platforms:
 
